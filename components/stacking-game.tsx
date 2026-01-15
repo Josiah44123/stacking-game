@@ -14,14 +14,25 @@ export default function StackingGame({ playerName, onViewLeaderboard, onChangeNa
   const [gameOver, setGameOver] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const handleGameOver = (finalScore: number) => {
+  // UPDATED: Save to Supabase Backend
+  const handleGameOver = async (finalScore: number) => {
     setScore(finalScore)
     setGameOver(true)
 
-    const scores = JSON.parse(localStorage.getItem("scores") || "[]")
-    scores.push({ name: playerName, score: finalScore, date: new Date().toISOString() })
-    scores.sort((a, b) => b.score - a.score) // Sort scores in descending order
-    localStorage.setItem("scores", JSON.stringify(scores))
+    // 1. Save to Backend (Supabase)
+    try {
+      await fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            name: playerName || "Anonymous", 
+            score: finalScore 
+        })
+      });
+      console.log("Score saved to database!");
+    } catch (error) {
+      console.error("Failed to save score:", error);
+    }
   }
 
   const handleRestart = () => {
