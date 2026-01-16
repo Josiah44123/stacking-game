@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 
 interface PlayerEntryProps {
@@ -26,8 +25,11 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
         <h1 className="text-6xl font-bold text-white mb-4 drop-shadow-lg">Chick Stack</h1>
         <p className="text-2xl text-white mb-12 drop-shadow-lg">Help the chick jump over the blocks!</p>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-8 shadow-2xl w-80">
-          <label className="block text-gray-800 font-bold mb-4 text-lg">Enter Your Name</label>
+        {/* Added 'mx-auto' to center the box, and 'text-center' to the label */}
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-8 shadow-2xl w-80 mx-auto">
+          <label className="block text-gray-800 font-bold mb-4 text-lg text-center">
+            Enter Your Name
+          </label>
           <input
             type="text"
             value={name}
