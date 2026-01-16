@@ -11,7 +11,9 @@ export const metadata: Metadata = {
   title: "Stack Game",
   description: "Click to stack blocks and compete on the leaderboard",
   generator: "Next.js",
-  
+  icons: {
+    icon: "/icon.svg", 
+  },
 }
 
 export default function RootLayout({
