@@ -34,20 +34,20 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     canvas.height = gameHeight
 
     // Game Constants
-    const BLOCK_HEIGHT = 25
+    const BLOCK_HEIGHT = 30
     const INITIAL_WIDTH = 150
     const START_SPEED = 4
-    const CHICK_SIZE = 20 
+    const CHICK_SIZE = 24 
     
-    // Physics Constants
-    const GRAVITY = 0.5
-    const JUMP_STRENGTH = -8
+    // Physics
+    const GRAVITY = 0.4
+    const JUMP_STRENGTH = -7.5
 
     // Game State
     let stackedBlocks: Array<{ x: number, y: number, width: number, color: string }> = []
     let score = 0
     let gameOver = false 
-    let isFalling = false 
+    let showGameOverScreen = false 
     let gameStarted = false
     let animationId: number
     
@@ -58,13 +58,14 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     let direction = 1 
     let cameraOffset = 0
 
-    // --- Chick Physics State ---
+    // Chick State
+    let chickX = 0 
+    let chickY = 0
+    let chickVelY = 0
     let chickState: 'standing' | 'jumping' | 'falling' = 'standing'
-    let chickPos = { x: 0, y: 0 }
-    let chickVel = { x: 0, y: 0 }
     let chickJumpFrame = 0
+    let isScared = false 
 
-    // Colors
     const colors = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#F38181", "#AA96DA", "#FCBAD3", "#A8D8EA"]
 
     // --- Core Logic ---
@@ -73,7 +74,7 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       stackedBlocks = []
       score = 0
       gameOver = false
-      isFalling = false
+      showGameOverScreen = false
       gameStarted = false
       currentWidth = INITIAL_WIDTH
       currentX = (gameWidth - INITIAL_WIDTH) / 2
@@ -91,81 +92,124 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         color: colors[0]
       })
 
-      // Reset chick physics
+      // Reset Chick
       chickState = 'standing'
-      // Center on base block
-      chickPos = { x: baseX + INITIAL_WIDTH / 2, y: baseY }
-      chickVel = { x: 0, y: 0 }
-      chickJumpFrame = 0
+      chickX = baseX + INITIAL_WIDTH / 2 
+      chickY = baseY
+      chickVelY = 0
+      isScared = false
     }
 
-    // --- Helper: Draw the Simple Cute Chick ---
+    // Helper: Draw Spikes on the LEADING EDGE (Side)
+    const drawSpikes = (x: number, y: number, width: number, height: number, dir: number) => {
+        ctx.fillStyle = "#555"; 
+        ctx.beginPath();
+        
+        const spikeSize = 6;
+        const numSpikes = Math.floor(height / spikeSize);
+        
+        // If moving right (dir 1), draw spikes on right side
+        // If moving left (dir -1), draw spikes on left side
+        const startX = dir === 1 ? x + width : x;
+        const pointX = dir === 1 ? startX + 8 : startX - 8;
+        
+        for(let i = 0; i < numSpikes; i++) {
+            const topY = y + (i * spikeSize);
+            ctx.moveTo(startX, topY);
+            ctx.lineTo(pointX, topY + spikeSize/2);
+            ctx.lineTo(startX, topY + spikeSize);
+        }
+        ctx.fill();
+    }
+
     const drawChick = (x: number, y: number, state: string, jumpFrame: number) => {
-        const drawY = y - CHICK_SIZE/2 
+        const drawY = y - (CHICK_SIZE * 0.8) 
 
         ctx.save()
         ctx.translate(x, drawY)
 
-        if (state === 'falling') {
-             // Rotate slightly if falling for effect
-             ctx.rotate(Math.PI / 8 * (x > gameWidth/2 ? 1 : -1));
+        // --- SCARED BUBBLE ---
+        if (isScared && state === 'standing') {
+            ctx.fillStyle = "white";
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(15, -25, 8, 8, 0, 0, Math.PI*2);
+            ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "red";
+            ctx.font = "bold 12px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("!", 15, -21);
         }
 
-        // 1. Body (Simple Yellow Circle)
+        if (state === 'falling') {
+             ctx.rotate(jumpFrame * 0.15 * (x > gameWidth/2 ? 1 : -1));
+        }
+
+        // 1. Body 
         ctx.beginPath()
+        let scaleX = 1; let scaleY = 1;
+        if (state === 'jumping') { scaleX = 0.9; scaleY = 1.1; }
+        
+        ctx.scale(scaleX, scaleY);
         ctx.arc(0, 0, CHICK_SIZE / 1.5, 0, Math.PI * 2)
-        ctx.fillStyle = "#FFD700" // Gold
+        ctx.fillStyle = "#FFD700" 
         ctx.fill()
         ctx.strokeStyle = "#DAA520"
         ctx.lineWidth = 2
         ctx.stroke()
+        ctx.scale(1/scaleX, 1/scaleY);
 
-        // 2. Eyes (Simple Black Dots)
+        // 2. Eyes
         ctx.fillStyle = "black"
         ctx.beginPath()
-        
         let eyeOffsetY = -2;
-        // Look down if falling
-        if (state === 'falling') eyeOffsetY = 2;
+        if (state === 'falling') {
+             // X eyes
+             ctx.strokeStyle = "black"; ctx.lineWidth = 2;
+             ctx.moveTo(-7, -4); ctx.lineTo(-3, 0); ctx.moveTo(-3, -4); ctx.lineTo(-7, 0);
+             ctx.moveTo(3, -4); ctx.lineTo(7, 0); ctx.moveTo(7, -4); ctx.lineTo(3, 0);
+             ctx.stroke();
+             eyeOffsetY = 100; 
+        } else if (isScared) {
+            eyeOffsetY = -4; 
+        }
 
-        ctx.arc(-5, eyeOffsetY, 2, 0, Math.PI * 2) // Left eye
-        ctx.arc(5, eyeOffsetY, 2, 0, Math.PI * 2)  // Right eye
-        ctx.fill()
+        if (eyeOffsetY !== 100) {
+            ctx.arc(-5, eyeOffsetY, isScared ? 3 : 2, 0, Math.PI * 2) 
+            ctx.arc(5, eyeOffsetY, isScared ? 3 : 2, 0, Math.PI * 2)  
+            ctx.fill()
+        }
 
-        // 3. Beak (Orange Triangle)
+        // 3. Beak
         ctx.fillStyle = "#FF8C00"
         ctx.beginPath()
-        ctx.moveTo(-3, 2 + eyeOffsetY)
-        ctx.lineTo(3, 2 + eyeOffsetY)
-        ctx.lineTo(0, 6 + eyeOffsetY)
+        if (state === 'falling' || isScared) {
+             ctx.ellipse(0, 5, 3, 5, 0, 0, Math.PI*2);
+        } else {
+             ctx.moveTo(-3, 2 + eyeOffsetY)
+             ctx.lineTo(3, 2 + eyeOffsetY)
+             ctx.lineTo(0, 6 + eyeOffsetY)
+        }
         ctx.fill()
 
-        // 4. Blush (Pink Circles)
-        ctx.fillStyle = "rgba(255, 100, 100, 0.4)"
-        ctx.beginPath()
-        ctx.arc(-7, 3 + eyeOffsetY, 2, 0, Math.PI * 2)
-        ctx.arc(7, 3 + eyeOffsetY, 2, 0, Math.PI * 2)
-        ctx.fill()
+        // 4. Blush
+        if (state !== 'falling' && !isScared) {
+            ctx.fillStyle = "rgba(255, 100, 100, 0.4)"
+            ctx.beginPath()
+            ctx.arc(-7, 3 + eyeOffsetY, 2, 0, Math.PI * 2)
+            ctx.arc(7, 3 + eyeOffsetY, 2, 0, Math.PI * 2)
+            ctx.fill()
+        }
 
-        // 5. Wings (Only visible when jumping/falling)
+        // 5. Wings
         if (state === 'jumping' || state === 'falling') {
-            const wingFlap = Math.sin(jumpFrame * 0.5) * 3;
-            
+            const wingFlap = Math.sin(jumpFrame * 0.6) * 6; 
             ctx.fillStyle = "#FFD700"
             ctx.strokeStyle = "#DAA520"
             ctx.lineWidth = 1.5
-
-            // Left Wing
-            ctx.beginPath()
-            ctx.ellipse(-12, -wingFlap, 6, 3, Math.PI / 4, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.stroke()
-
-            // Right Wing
-            ctx.beginPath()
-            ctx.ellipse(12, -wingFlap, 6, 3, -Math.PI / 4, 0, Math.PI * 2)
-            ctx.fill()
-            ctx.stroke()
+            ctx.beginPath(); ctx.ellipse(-12, -wingFlap, 6, 3, Math.PI / 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(12, -wingFlap, 6, 3, -Math.PI / 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         }
 
         ctx.restore()
@@ -173,7 +217,7 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
 
     const placeBlock = () => {
       if (gameOver) {
-        resetGame()
+        if (showGameOverScreen) resetGame() 
         return
       }
 
@@ -182,9 +226,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         return
       }
 
-      // If already falling, ignore clicks
-      if (isFalling || chickState === 'falling') return;
-
       const topBlock = stackedBlocks[stackedBlocks.length - 1]
       
       const overlapStart = Math.max(currentX, topBlock.x)
@@ -192,16 +233,16 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       const overlap = overlapEnd - overlapStart
 
       if (overlap <= 0) {
-        // Missed completely. 
-        isFalling = true;
-        chickState = 'falling';
-        // Chick falls
+        // --- GAME OVER ---
+        gameOver = true
+        chickState = 'falling'
+        chickVelY = -6 
+        isScared = true 
       } else {
-        // Block placed successfully.
+        // --- SUCCESS ---
         currentWidth = overlap
         currentX = overlapStart
 
-        // Add the new block
         stackedBlocks.push({
           x: currentX,
           y: topBlock.y - BLOCK_HEIGHT,
@@ -209,30 +250,16 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
           color: colors[(score + 1) % colors.length] 
         })
 
-        // === PHYSICS CHECK ===
-        // Is the chick standing safely on the NEW block?
-        const isChickSafe = chickPos.x >= currentX && chickPos.x <= currentX + currentWidth;
+        score++
+        callbacks.current.onScoreChange(score)
+        speed += 0.2
+        
+        // Reset moving block
+        direction = Math.random() > 0.5 ? 1 : -1
+        currentX = direction === 1 ? -currentWidth : gameWidth
 
-        if (isChickSafe) {
-            // Safe! Jump to new block.
-            score++
-            callbacks.current.onScoreChange(score)
-            speed += 0.2
-            
-            // Trigger Jump
-            chickState = 'jumping'
-            chickVel.y = JUMP_STRENGTH
-            chickJumpFrame = 1
-
-            if (stackedBlocks.length > 6) {
-                cameraOffset += BLOCK_HEIGHT
-            }
-            currentX = -currentWidth // Reset moving block
-        } else {
-            // Chick is standing on the old block, but the new block was placed elsewhere (sliced off).
-            // The chick loses its footing and falls.
-            isFalling = true;
-            chickState = 'falling';
+        if (stackedBlocks.length > 5) {
+            cameraOffset += BLOCK_HEIGHT
         }
       }
     }
@@ -240,7 +267,7 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     const draw = () => {
       ctx.clearRect(0, 0, gameWidth, gameHeight)
 
-      // 1. Background
+      // Background
       const gradient = ctx.createLinearGradient(0, 0, 0, gameHeight)
       gradient.addColorStop(0, "#87CEEB")
       gradient.addColorStop(1, "#E0F6FF")
@@ -248,12 +275,11 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       ctx.fillRect(0, 0, gameWidth, gameHeight)
 
       ctx.save()
-      // Apply camera only if game isn't over (keeps UI stable)
-      if (!gameOver) {
-          ctx.translate(0, cameraOffset)
-      }
+      
+      if (!gameOver) ctx.translate(0, cameraOffset)
+      else ctx.translate(0, cameraOffset) 
 
-      // 2. Draw Stacked Blocks
+      // 1. Draw Stack
       stackedBlocks.forEach((block) => {
         ctx.fillStyle = block.color
         ctx.fillRect(block.x, block.y, block.width, BLOCK_HEIGHT)
@@ -262,88 +288,138 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         ctx.strokeRect(block.x, block.y, block.width, BLOCK_HEIGHT)
       })
 
-      // 3. Draw Moving Block
-      if (gameStarted && !gameOver && !isFalling) {
+      // 2. Logic: Moving Block & Chick AI
+      const topBlock = stackedBlocks[stackedBlocks.length - 1]
+      const chickFloor = topBlock.y; 
+
+      // --- SMOOTH CHICK MOVEMENT ---
+      const targetChickX = topBlock.x + topBlock.width / 2;
+      chickX += (targetChickX - chickX) * 0.15;
+
+      if (gameStarted && !gameOver) {
+        // Move Block
         currentX += speed * direction
         if (currentX + currentWidth > gameWidth) direction = -1
         else if (currentX < 0) direction = 1
 
-        const topY = stackedBlocks[stackedBlocks.length - 1].y - BLOCK_HEIGHT
+        const movingBlockY = chickFloor - BLOCK_HEIGHT
+        
+        // Draw Moving Block
         ctx.fillStyle = colors[(score + 1) % colors.length]
-        ctx.fillRect(currentX, topY, currentWidth, BLOCK_HEIGHT)
+        ctx.fillRect(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT)
         ctx.strokeStyle = "white"
         ctx.lineWidth = 2
-        ctx.strokeRect(currentX, topY, currentWidth, BLOCK_HEIGHT)
-      }
+        ctx.strokeRect(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT)
 
-      // --- 4. Update & Draw Chick Physics ---
+        // DRAW SPIKES ON LEADING EDGE
+        drawSpikes(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT, direction);
+
+        // --- CHICK DODGE AI (EDGE BASED) ---
+        // Calculate where the "Danger" is
+        let dangerX = 0;
+        if (direction === 1) {
+            // Moving Right: Danger is the Right Edge
+            dangerX = currentX + currentWidth;
+        } else {
+            // Moving Left: Danger is the Left Edge
+            dangerX = currentX;
+        }
+
+        // If chick is on the ground
+        if (chickState === 'standing') {
+            // Distance between Chick Center and the Danger Edge
+            const distToSpikes = Math.abs(chickX - dangerX);
+
+            // Detection for scared face
+            // We only care if the block is actually overlapping/threatening the chick
+            // (i.e., not when the block is far away on the other side of the screen)
+            const isThreatening = (direction === 1 && currentX < chickX) || (direction === -1 && currentX + currentWidth > chickX);
+
+            if (isThreatening && distToSpikes < 70) {
+                isScared = true;
+            } else {
+                isScared = false;
+            }
+
+            // JUMP when spikes are close
+            if (isThreatening && distToSpikes < 45) {
+                chickState = 'jumping'
+                chickVelY = JUMP_STRENGTH
+                isScared = false; 
+            }
+        }
+        
+        // --- CHICK PHYSICS ---
+        if (chickState === 'jumping') {
+            chickY += chickVelY
+            chickVelY += GRAVITY
+            chickJumpFrame++
+
+            // Landing logic
+            if (chickVelY > 0 && chickY >= chickFloor) {
+                chickY = chickFloor
+                chickState = 'standing'
+                chickVelY = 0
+            }
+        }
+
+      } else if (gameOver) {
+         // --- FALL ANIMATION LOOP ---
+         chickY += chickVelY
+         chickVelY += GRAVITY
+         chickJumpFrame++
+         
+         const fallLimit = gameHeight + 100;
+         if ((chickY + cameraOffset) > fallLimit && !showGameOverScreen) {
+             showGameOverScreen = true;
+             callbacks.current.onGameOver(score);
+         }
+      } 
       
-      if (chickState === 'jumping') {
-          chickPos.y += chickVel.y
-          chickVel.y += GRAVITY // Apply gravity
-          chickJumpFrame++
-
-          // Check Landing condition
-          const targetBlock = stackedBlocks[stackedBlocks.length - 1];
-          // If moving down AND below the target surface
-          if (chickVel.y > 0 && chickPos.y >= targetBlock.y) {
-              chickPos.y = targetBlock.y
-              chickState = 'standing'
-              chickVel.y = 0
-          }
-
-      } else if (chickState === 'falling') {
-          chickPos.y += chickVel.y
-          chickVel.y += GRAVITY
-          chickJumpFrame++ 
-
-          // Game Over Trigger when off screen
-          const screenY = chickPos.y + (gameOver ? 0 : cameraOffset);
-          if (screenY > gameHeight + 50 && !gameOver) {
-              gameOver = true
-              callbacks.current.onGameOver(score)
-          }
-      } else if (chickState === 'standing') {
-          // Lock to the top block
-          const targetBlock = stackedBlocks[stackedBlocks.length - 1];
-          chickPos.y = targetBlock.y;
+      // Always Draw Chick (using smoothed X)
+      if (!gameStarted) {
+         drawChick(chickX, chickFloor, 'standing', 0) 
+      } else {
+         drawChick(chickX, chickY, chickState, chickJumpFrame)
       }
-
-      // DRAW CHICK LAST (So it's always on top of the blocks)
-      drawChick(chickPos.x, chickPos.y, chickState, chickJumpFrame)
 
       ctx.restore()
 
-      // 5. UI Overlays
+      // UI
       if (!gameStarted) {
         ctx.fillStyle = "rgba(0,0,0,0.5)"
         ctx.fillRect(0, 0, gameWidth, gameHeight)
         ctx.fillStyle = "white"
         ctx.font = "bold 24px Arial"
         ctx.textAlign = "center"
-        ctx.fillText("Click to Start", gameWidth/2, gameHeight/2)
-      } else if (gameOver) {
-        ctx.fillStyle = "rgba(0,0,0,0.7)"
+        ctx.fillText("Click to Stack", gameWidth/2, gameHeight/2)
+      } else if (showGameOverScreen) { 
+        ctx.fillStyle = "rgba(0,0,0,0.3)" 
         ctx.fillRect(0, 0, gameWidth, gameHeight)
+        
         ctx.fillStyle = "white"
         ctx.font = "bold 30px Arial"
         ctx.textAlign = "center"
+        ctx.shadowColor="black"
+        ctx.shadowBlur=4
         ctx.fillText("Game Over", gameWidth/2, gameHeight/2 - 20)
+        
         ctx.font = "20px Arial"
         ctx.fillText(`Score: ${score}`, gameWidth/2, gameHeight/2 + 20)
+        
         ctx.font = "14px Arial"
         ctx.fillStyle = "#FFD700"
-        ctx.fillText("Click to Try Again", gameWidth/2, gameHeight/2 + 50)
+        ctx.fillText("Click to Retry", gameWidth/2, gameHeight/2 + 50)
+        
+        ctx.shadowBlur=0
       }
 
       animationId = requestAnimationFrame(draw)
     }
 
-    // Initialize Game
     resetGame()
     draw()
 
-    // Events
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space") {
         e.preventDefault()

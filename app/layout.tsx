@@ -10,11 +10,8 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Stack Game",
   description: "Click to stack blocks and compete on the leaderboard",
-  generator: "v0.app",
-  icons: {
-    icon: "/icon.svg", 
-  },
-}
+
+};
 
 export default function RootLayout({
   children,
