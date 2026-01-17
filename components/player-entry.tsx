@@ -19,7 +19,7 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
   }
 
   return (
-    <div className="relative flex items-center justify-center min-h-screen overflow-hidden bg-sky-300">
+    <div className="relative flex items-start justify-center min-h-screen overflow-hidden bg-sky-300 pt-20 md:pt-28">
       {/* Dynamic Sky Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-sky-400 via-sky-300 to-cyan-200">
         <MovingClouds />
@@ -28,7 +28,8 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
       <div className="relative z-10 flex flex-col items-center w-full max-w-md px-4">
         
         {/* Bouncing Title */}
-        <div className="mb-8 text-center animate-bounce-slow">
+        {/* CHANGE HERE: Increased 'mb-10' to 'mb-24' to push title much higher above the chick */}
+        <div className="mb-24 text-center animate-bounce-slow">
           <h1 className="text-7xl font-black tracking-wider text-white drop-shadow-[0_4px_0_rgba(0,0,0,0.2)] transform -rotate-2">
             <span className="text-yellow-300">CHICK</span>
             <span className="block text-6xl text-white mt-[-10px]">STACK</span>
@@ -88,27 +89,19 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
   )
 }
 
-// --- Sub Components for Visual Flair ---
 
 function BouncingChick({ happy }: { happy: boolean }) {
   return (
     <div className={`transition-transform duration-300 ${happy ? 'scale-110 translate-y-2' : 'animate-bounce'}`}>
       <div className="relative w-24 h-24">
-        {/* Body */}
         <div className="absolute inset-0 bg-yellow-400 rounded-full border-4 border-yellow-600 shadow-inner"></div>
-        {/* Eyes */}
         <div className="absolute top-8 left-6 w-3 h-3 bg-black rounded-full animate-blink"></div>
         <div className="absolute top-8 right-6 w-3 h-3 bg-black rounded-full animate-blink"></div>
-        {/* Blush */}
         <div className="absolute top-10 left-4 w-4 h-2 bg-pink-300 rounded-full opacity-60"></div>
         <div className="absolute top-10 right-4 w-4 h-2 bg-pink-300 rounded-full opacity-60"></div>
-        {/* Beak */}
         <div className="absolute top-10 left-1/2 -translate-x-1/2 w-6 h-6 bg-orange-500 rounded-sm rotate-45 border-2 border-orange-600"></div>
-        {/* Wing (Right) */}
         <div className={`absolute top-12 -right-2 w-6 h-8 bg-yellow-500 rounded-full border-2 border-yellow-600 origin-top-left transition-transform ${happy ? 'rotate-45' : 'rotate-12'}`}></div>
-        {/* Wing (Left) */}
         <div className={`absolute top-12 -left-2 w-6 h-8 bg-yellow-500 rounded-full border-2 border-yellow-600 origin-top-right transition-transform ${happy ? '-rotate-45' : '-rotate-12'}`}></div>
-        {/* Comb (Top hair) */}
         <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-6 bg-red-500 rounded-full border-2 border-red-700"></div>
       </div>
     </div>
@@ -118,15 +111,12 @@ function BouncingChick({ happy }: { happy: boolean }) {
 function MovingClouds() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Cloud 1 */}
       <div className="absolute top-10 left-[-100px] opacity-80 animate-[float_15s_linear_infinite]">
         <CloudShape scale={1.2} />
       </div>
-      {/* Cloud 2 */}
       <div className="absolute top-40 right-[-100px] opacity-60 animate-[float_25s_linear_infinite_reverse]">
         <CloudShape scale={0.8} />
       </div>
-      {/* Cloud 3 */}
       <div className="absolute bottom-20 left-1/4 opacity-40 animate-[pulse_4s_ease-in-out_infinite]">
         <CloudShape scale={1.5} />
       </div>
