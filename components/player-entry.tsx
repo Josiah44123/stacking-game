@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react" // 1. Import useEffect
 
 interface PlayerEntryProps {
   onNameSubmit: (name: string) => void
@@ -11,9 +11,19 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
   const [name, setName] = useState("")
   const [isHovering, setIsHovering] = useState(false)
 
+  // 2. Load the name from LocalStorage when the component mounts
+  useEffect(() => {
+    const savedName = localStorage.getItem("chickStackPlayerName")
+    if (savedName) {
+      setName(savedName)
+    }
+  }, [])
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (name.trim()) {
+      // 3. Save the name to LocalStorage when submitting
+      localStorage.setItem("chickStackPlayerName", name.trim())
       onNameSubmit(name.trim())
     }
   }
@@ -87,7 +97,6 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
     </div>
   )
 }
-
 
 function BouncingChick({ happy }: { happy: boolean }) {
   return (
