@@ -1,21 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import StackingGame from "@/components/stacking-game"
 import PlayerEntry from "@/components/player-entry"
 import Leaderboard from "@/components/leaderboard"
 
 export default function Home() {
+  // We initialize as null so we ALWAYS show the entry screen first
   const [playerName, setPlayerName] = useState<string | null>(null)
   const [gameStarted, setGameStarted] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
 
-  useEffect(() => {
-    const savedName = localStorage.getItem("playerName")
-    if (savedName) {
-      setPlayerName(savedName)
-    }
-  }, [])
+  // REMOVED: The useEffect that checked localStorage and skipped the screen.
+  // Now the user always sees the 'PlayerEntry' screen first.
 
   const handleNameSubmit = (name: string) => {
     localStorage.setItem("playerName", name)
@@ -26,13 +23,11 @@ export default function Home() {
   const handleBackToMenu = () => {
     setGameStarted(false)
     setShowLeaderboard(false)
+   
   }
 
-  if (!playerName) {
-    return <PlayerEntry onNameSubmit={handleNameSubmit} />
-  }
-
-  if (showLeaderboard) {
+  // 1. If we are viewing the leaderboard
+  if (showLeaderboard && playerName) {
     return (
       <Leaderboard
         playerName={playerName}
@@ -40,12 +35,14 @@ export default function Home() {
         onChangeName={() => {
           localStorage.removeItem("playerName")
           setPlayerName(null)
+          setShowLeaderboard(false)
         }}
       />
     )
   }
 
-  if (gameStarted) {
+  // 2. If the game has started
+  if (gameStarted && playerName) {
     return (
       <StackingGame
         playerName={playerName}
@@ -53,28 +50,12 @@ export default function Home() {
         onChangeName={() => {
           localStorage.removeItem("playerName")
           setPlayerName(null)
+          setGameStarted(false)
         }}
       />
     )
   }
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-300 via-sky-200 to-cyan-200">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold text-white mb-8 drop-shadow-lg">Chick Stack</h1>
-        <button
-          onClick={() => setGameStarted(true)}
-          className="px-8 py-4 bg-yellow-400 text-gray-800 font-bold text-xl rounded-full hover:bg-yellow-300 transition shadow-lg"
-        >
-          Start Playing
-        </button>
-        <button
-          onClick={() => setShowLeaderboard(true)}
-          className="px-8 py-4 ml-4 bg-purple-500 text-white font-bold text-xl rounded-full hover:bg-purple-600 transition shadow-lg"
-        >
-          View Leaderboard
-        </button>
-      </div>
-    </div>
-  )
+  // 3. Otherwise, show the cool Entry Screen 
+  return <PlayerEntry onNameSubmit={handleNameSubmit} />
 }
