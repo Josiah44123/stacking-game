@@ -28,7 +28,6 @@ export default function PlayerEntry({ onNameSubmit }: PlayerEntryProps) {
       <div className="relative z-10 flex flex-col items-center w-full max-w-md px-4">
         
         {/* Bouncing Title */}
-        {/* CHANGE HERE: Increased 'mb-10' to 'mb-24' to push title much higher above the chick */}
         <div className="mb-24 text-center animate-bounce-slow">
           <h1 className="text-7xl font-black tracking-wider text-white drop-shadow-[0_4px_0_rgba(0,0,0,0.2)] transform -rotate-2">
             <span className="text-yellow-300">CHICK</span>
