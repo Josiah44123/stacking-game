@@ -11,8 +11,6 @@ interface GameCanvasProps {
 const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChange, onGameOver }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const callbacks = useRef({ onScoreChange, onGameOver })
-  
-  // Keep track of the last frame time for Delta Time calculation
   const lastTimeRef = useRef<number>(0)
 
   useEffect(() => {
@@ -34,13 +32,12 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     canvas.width = gameWidth
     canvas.height = gameHeight
 
-    // Game Constants
+    // Constants
     const BLOCK_HEIGHT = 30
     const INITIAL_WIDTH = 150
-    const START_SPEED = 4
+   // Lower start speed (was 4)
+    const START_SPEED = 3 
     const CHICK_SIZE = 24 
-    
-    // Physics
     const GRAVITY = 0.4
     const JUMP_STRENGTH = -7.5
 
@@ -52,14 +49,14 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     let gameStarted = false
     let animationId: number
     
-    // Moving Block State
+    // Movement
     let currentX = 0
     let currentWidth = INITIAL_WIDTH
     let speed = START_SPEED
     let direction = 1 
     let cameraOffset = 0
 
-    // Chick State
+    // Chick
     let chickX = 0 
     let chickY = 0
     let chickVelY = 0
@@ -67,7 +64,15 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     let chickJumpFrame = 0
     let isScared = false 
 
-    const colors = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#F38181", "#AA96DA", "#FCBAD3", "#A8D8EA"]
+    const colors = [
+        "#F43F5E", // Rose
+        "#F59E0B", // Amber
+        "#10B981", // Emerald
+        "#8B5CF6", // Violet
+        "#EC4899", // Pink
+        "#06B6D4", // Cyan
+        "#FB923C", // Orange
+    ]
 
     const resetGame = () => {
       stackedBlocks = []
@@ -97,9 +102,60 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       isScared = false
     }
 
-    // Helper: Draw Spikes
+    // --- DRAWING HELPERS ---
+
+    const drawBackground = () => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, gameHeight)
+        // Light Blue (Top) -> Dark Blue (Bottom)
+        gradient.addColorStop(0, "#60A5FA") 
+        gradient.addColorStop(1, "#1e3a8a") 
+        ctx.fillStyle = gradient
+        ctx.fillRect(0, 0, gameWidth, gameHeight)
+
+        ctx.save()
+        ctx.translate(0, cameraOffset * 0.5)
+
+        // Sun
+        ctx.fillStyle = "#FFD700"
+        ctx.shadowColor = "#FFA500"
+        ctx.shadowBlur = 20
+        ctx.beginPath()
+        ctx.arc(gameWidth - 40, 50, 25, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.shadowBlur = 0
+
+        // Ground Hills
+        const groundY = gameHeight
+        ctx.fillStyle = "#69D178"
+        ctx.beginPath()
+        ctx.moveTo(0, groundY)
+        ctx.quadraticCurveTo(gameWidth / 4, groundY - 50, gameWidth / 2, groundY - 20)
+        ctx.quadraticCurveTo(gameWidth * 0.75, groundY + 10, gameWidth, groundY - 30)
+        ctx.lineTo(gameWidth, groundY + 100)
+        ctx.lineTo(0, groundY + 100)
+        ctx.fill()
+
+        ctx.restore()
+    }
+
+    const drawTexturedBlock = (x: number, y: number, width: number, height: number, color: string) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, width, height);
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fillRect(x, y, width, height * 0.15); 
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.fillRect(x, y + height * 0.85, width, height * 0.15); 
+        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.beginPath();
+        ctx.arc(x + 5, y + 5, 2, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
     const drawSpikes = (x: number, y: number, width: number, height: number, dir: number) => {
-        ctx.fillStyle = "#555"; 
+        ctx.fillStyle = "#E2E8F0"; 
         ctx.beginPath();
         const spikeSize = 6;
         const numSpikes = Math.floor(height / spikeSize);
@@ -186,7 +242,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
 
       if (!gameStarted) {
         gameStarted = true
-        // Initialize time on start
         lastTimeRef.current = performance.now();
         return
       }
@@ -214,7 +269,10 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
 
         score++
         callbacks.current.onScoreChange(score)
-        speed += 0.2
+        
+        // CHANGED: Reduced speed increase from 0.2 to 0.08
+        // This makes the game get harder much slower
+        speed += 0.08
         
         direction = Math.random() > 0.5 ? 1 : -1
         currentX = direction === 1 ? -currentWidth : gameWidth
@@ -223,48 +281,32 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       }
     }
 
-    // --- MAIN DRAW LOOP ---
     const draw = (timestamp: number) => {
-      // 1. Calculate Delta Time
       if (!lastTimeRef.current) lastTimeRef.current = timestamp;
       const deltaTime = timestamp - lastTimeRef.current;
       lastTimeRef.current = timestamp;
 
-      // 2. Create Time Scale (Target 60 FPS = 16.67ms)
-      // If screen is 120Hz (8ms), timeScale will be ~0.5
-      // If screen is 60Hz (16ms), timeScale will be ~1.0
-      const targetFrameTime = 1000 / 60; // ~16.67ms
+      const targetFrameTime = 1000 / 60;
       const timeScale = deltaTime / targetFrameTime;
 
       ctx.clearRect(0, 0, gameWidth, gameHeight)
 
-      // Background
-      const gradient = ctx.createLinearGradient(0, 0, 0, gameHeight)
-      gradient.addColorStop(0, "#87CEEB")
-      gradient.addColorStop(1, "#E0F6FF")
-      ctx.fillStyle = gradient
-      ctx.fillRect(0, 0, gameWidth, gameHeight)
+      drawBackground()
 
       ctx.save()
       ctx.translate(0, cameraOffset) 
 
       stackedBlocks.forEach((block) => {
-        ctx.fillStyle = block.color
-        ctx.fillRect(block.x, block.y, block.width, BLOCK_HEIGHT)
-        ctx.strokeStyle = "rgba(0,0,0,0.1)"
-        ctx.lineWidth = 1
-        ctx.strokeRect(block.x, block.y, block.width, BLOCK_HEIGHT)
+        drawTexturedBlock(block.x, block.y, block.width, BLOCK_HEIGHT, block.color)
       })
 
       const topBlock = stackedBlocks[stackedBlocks.length - 1]
       const chickFloor = topBlock.y; 
 
-      // Apply timeScale to Lerp (approximation)
       const targetChickX = topBlock.x + topBlock.width / 2;
-      chickX += (targetChickX - chickX) * (0.15 * timeScale); // Scale interpolation
+      chickX += (targetChickX - chickX) * (0.15 * timeScale); 
 
       if (gameStarted && !gameOver) {
-        // SCALED MOVEMENT
         currentX += (speed * direction) * timeScale;
         
         if (currentX + currentWidth > gameWidth) direction = -1
@@ -272,12 +314,8 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
 
         const movingBlockY = chickFloor - BLOCK_HEIGHT
         
-        ctx.fillStyle = colors[(score + 1) % colors.length]
-        ctx.fillRect(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT)
-        ctx.strokeStyle = "white"
-        ctx.lineWidth = 2
-        ctx.strokeRect(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT)
-
+        drawTexturedBlock(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT, colors[(score + 1) % colors.length])
+        
         drawSpikes(currentX, movingBlockY, currentWidth, BLOCK_HEIGHT, direction);
 
         let dangerX = 0;
@@ -299,7 +337,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         }
         
         if (chickState === 'jumping') {
-            // SCALED PHYSICS
             chickY += chickVelY * timeScale
             chickVelY += GRAVITY * timeScale
             chickJumpFrame += 1 * timeScale
@@ -312,7 +349,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         }
 
       } else if (gameOver) {
-         // SCALED FALLING
          chickY += chickVelY * timeScale
          chickVelY += GRAVITY * timeScale
          chickJumpFrame += 1 * timeScale
@@ -339,8 +375,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         ctx.fillStyle = "white"; ctx.font = "bold 30px Arial"; ctx.textAlign = "center";
         ctx.shadowColor="black"; ctx.shadowBlur=4;
         ctx.fillText("Game Over", gameWidth/2, gameHeight/2 - 20)
-        ctx.font = "20px Arial"; ctx.fillText(`Score: ${score}`, gameWidth/2, gameHeight/2 + 20)
-        ctx.font = "14px Arial"; ctx.fillStyle = "#FFD700"; ctx.fillText("Click to Retry", gameWidth/2, gameHeight/2 + 50)
         ctx.shadowBlur=0
       }
 
@@ -348,7 +382,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     }
 
     resetGame()
-    // Start loop with correct timestamp
     animationId = requestAnimationFrame(draw)
 
     const handleKeyDown = (e: KeyboardEvent) => {
