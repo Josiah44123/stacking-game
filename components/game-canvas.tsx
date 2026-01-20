@@ -13,6 +13,9 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
   const callbacks = useRef({ onScoreChange, onGameOver })
   const lastTimeRef = useRef<number>(0)
 
+  // Stable references for stars so they don't jitter
+  const starsRef = useRef<{x: number, y: number, size: number, alpha: number}[]>([])
+
   useEffect(() => {
     callbacks.current = { onScoreChange, onGameOver }
   }, [onScoreChange, onGameOver])
@@ -32,20 +35,31 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     canvas.width = gameWidth
     canvas.height = gameHeight
 
+    // Initialize Stars once
+    if (starsRef.current.length === 0) {
+        for(let i=0; i<50; i++) {
+            starsRef.current.push({
+                x: Math.random() * gameWidth,
+                y: Math.random() * gameHeight,
+                size: Math.random() * 2,
+                alpha: Math.random()
+            })
+        }
+    }
+
     // Constants
     const BLOCK_HEIGHT = 30
     const INITIAL_WIDTH = 150
-   // Lower start speed (was 4)
-    const START_SPEED = 3 
-    const CHICK_SIZE = 24 
+    const START_SPEED = 3
+    const CHICK_SIZE = 24
     const GRAVITY = 0.4
     const JUMP_STRENGTH = -7.5
 
     // Game State
     let stackedBlocks: Array<{ x: number, y: number, width: number, color: string }> = []
     let score = 0
-    let gameOver = false 
-    let showGameOverScreen = false 
+    let gameOver = false
+    let showGameOverScreen = false
     let gameStarted = false
     let animationId: number
     
@@ -53,26 +67,31 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     let currentX = 0
     let currentWidth = INITIAL_WIDTH
     let speed = START_SPEED
-    let direction = 1 
+    let direction = 1
     let cameraOffset = 0
 
     // Chick
-    let chickX = 0 
+    let chickX = 0
     let chickY = 0
     let chickVelY = 0
     let chickState: 'standing' | 'jumping' | 'falling' = 'standing'
     let chickJumpFrame = 0
-    let isScared = false 
+    let isScared = false
 
+    // --- THEME: COOL GALAXY ---
+    // Starts with calming Cyans/Blues, moving into Purples/Pinks
     const colors = [
-        "#F43F5E", // Rose
-        "#F59E0B", // Amber
-        "#10B981", // Emerald
+        "#22D3EE", // Cyan (Start)
+        "#4ADE80", // Light Green
+        "#60A5FA", // Sky Blue
+        "#3B82F6", // Royal Blue
+        "#6366F1", // Indigo
         "#8B5CF6", // Violet
+        "#A855F7", // Purple
+        "#D946EF", // Fuchsia
         "#EC4899", // Pink
-        "#06B6D4", // Cyan
-        "#FB923C", // Orange
-    ]
+        "#F43F5E", // Rose (Only appears later)
+    ];
 
     const resetGame = () => {
       stackedBlocks = []
@@ -96,7 +115,7 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       })
 
       chickState = 'standing'
-      chickX = baseX + INITIAL_WIDTH / 2 
+      chickX = baseX + INITIAL_WIDTH / 2
       chickY = baseY
       chickVelY = 0
       isScared = false
@@ -106,27 +125,54 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
 
     const drawBackground = () => {
         const gradient = ctx.createLinearGradient(0, 0, 0, gameHeight)
-        // Light Blue (Top) -> Dark Blue (Bottom)
-        gradient.addColorStop(0, "#60A5FA") 
-        gradient.addColorStop(1, "#1e3a8a") 
+        // Midnight Gradient: Deep Space (Top) -> Dark Horizon (Bottom)
+        gradient.addColorStop(0, "#0F172A") // Slate 900
+        gradient.addColorStop(1, "#312E81") // Indigo 900
+        
         ctx.fillStyle = gradient
         ctx.fillRect(0, 0, gameWidth, gameHeight)
 
         ctx.save()
-        ctx.translate(0, cameraOffset * 0.5)
+        ctx.translate(0, cameraOffset * 0.2) // Slower parallax for background elements
 
-        // Sun
-        ctx.fillStyle = "#FFD700"
-        ctx.shadowColor = "#FFA500"
-        ctx.shadowBlur = 20
-        ctx.beginPath()
-        ctx.arc(gameWidth - 40, 50, 25, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.shadowBlur = 0
+        // Draw Stars
+        ctx.fillStyle = "white";
+        starsRef.current.forEach(star => {
+            ctx.globalAlpha = star.alpha;
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
 
-        // Ground Hills
+        // Moon (Glowing White/Pale Blue)
+        const moonX = gameWidth - 50;
+        const moonY = 80;
+        
+        // Moon Glow
+        const glowGradient = ctx.createRadialGradient(moonX, moonY, 15, moonX, moonY, 45);
+        glowGradient.addColorStop(0, "rgba(255, 255, 255, 0.2)");
+        glowGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = glowGradient;
+        ctx.beginPath(); ctx.arc(moonX, moonY, 45, 0, Math.PI * 2); ctx.fill();
+
+        // Moon Body
+        ctx.fillStyle = "#F8FAFC"; // Off-white
+        ctx.shadowColor = "#E2E8F0";
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(moonX, moonY, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Moon Craters (Subtle)
+        ctx.fillStyle = "#CBD5E1";
+        ctx.beginPath(); ctx.arc(moonX - 5, moonY + 5, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(moonX + 8, moonY - 2, 2, 0, Math.PI*2); ctx.fill();
+
+        // Ground Hills (Darker Silhouette)
         const groundY = gameHeight
-        ctx.fillStyle = "#69D178"
+        ctx.fillStyle = "#020617" // Very Dark Blue/Black
         ctx.beginPath()
         ctx.moveTo(0, groundY)
         ctx.quadraticCurveTo(gameWidth / 4, groundY - 50, gameWidth / 2, groundY - 20)
@@ -139,23 +185,46 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     }
 
     const drawTexturedBlock = (x: number, y: number, width: number, height: number, color: string) => {
-        ctx.fillStyle = color;
+        // 1. Base Gradient
+        const gradient = ctx.createLinearGradient(x, y, x, y + height);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, adjustColorBrightness(color, -15)); 
+        
+        ctx.fillStyle = gradient;
         ctx.fillRect(x, y, width, height);
-        ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.fillRect(x, y, width, height * 0.15); 
+
+        // 2. Glassy Top Highlight
+        ctx.fillStyle = "rgba(255,255,255,0.25)";
+        ctx.fillRect(x, y, width, height * 0.2); 
+
+        // 3. Subtle Shadow Bottom
         ctx.fillStyle = "rgba(0,0,0,0.15)";
         ctx.fillRect(x, y + height * 0.85, width, height * 0.15); 
-        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+
+        // 4. Clean Border
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
         ctx.lineWidth = 1;
         ctx.strokeRect(x, y, width, height);
-        ctx.fillStyle = "rgba(255,255,255,0.3)";
+
+        // 5. Specular Highlight (The "shiny" dot)
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
         ctx.beginPath();
-        ctx.arc(x + 5, y + 5, 2, 0, Math.PI * 2);
+        ctx.arc(x + 10, y + 8, 1.5, 0, Math.PI * 2);
         ctx.fill();
     }
 
+    const adjustColorBrightness = (hex: string, percent: number) => {
+        const num = parseInt(hex.replace("#",""), 16),
+        amt = Math.round(2.55 * percent),
+        R = (num >> 16) + amt,
+        G = (num >> 8 & 0x00FF) + amt,
+        B = (num & 0x0000FF) + amt;
+        return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (G<255?G<1?0:G:255)*0x100 + (B<255?B<1?0:B:255)).toString(16).slice(1);
+    }
+
     const drawSpikes = (x: number, y: number, width: number, height: number, dir: number) => {
-        ctx.fillStyle = "#E2E8F0"; 
+        // Spikes: Cool metallic silver
+        ctx.fillStyle = "#94A3B8"; 
         ctx.beginPath();
         const spikeSize = 6;
         const numSpikes = Math.floor(height / spikeSize);
@@ -172,10 +241,11 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
     }
 
     const drawChick = (x: number, y: number, state: string, jumpFrame: number) => {
-        const drawY = y - (CHICK_SIZE * 0.8) 
+        const drawY = y - (CHICK_SIZE * 0.8)
         ctx.save()
         ctx.translate(x, drawY)
 
+        // Scared Bubble
         if (isScared && state === 'standing') {
             ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 1;
             ctx.beginPath(); ctx.ellipse(15, -25, 8, 8, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
@@ -184,24 +254,34 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
 
         if (state === 'falling') ctx.rotate(jumpFrame * 0.15 * (x > gameWidth/2 ? 1 : -1));
 
+        // Chick Body (Golden Yellow - stands out on dark bg)
         ctx.beginPath()
         let scaleX = 1; let scaleY = 1;
         if (state === 'jumping') { scaleX = 0.9; scaleY = 1.1; }
         
         ctx.scale(scaleX, scaleY);
         ctx.arc(0, 0, CHICK_SIZE / 1.5, 0, Math.PI * 2)
-        ctx.fillStyle = "#FFD700" 
+        ctx.fillStyle = "#FFC107" // Amber 400
         ctx.fill()
-        ctx.strokeStyle = "#DAA520"
+        
+        // Subtle inner glow
+        const grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, CHICK_SIZE/1.5);
+        grad.addColorStop(0, "#FFD54F");
+        grad.addColorStop(1, "#FFC107");
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.strokeStyle = "#B45309"
         ctx.lineWidth = 2
         ctx.stroke()
         ctx.scale(1/scaleX, 1/scaleY);
 
-        ctx.fillStyle = "black"
+        // Eyes
+        ctx.fillStyle = "#1E293B" // Dark Blue/Black eyes
         ctx.beginPath()
         let eyeOffsetY = -2;
         if (state === 'falling') {
-             ctx.strokeStyle = "black"; ctx.lineWidth = 2;
+             ctx.strokeStyle = "#1E293B"; ctx.lineWidth = 2;
              ctx.moveTo(-7, -4); ctx.lineTo(-3, 0); ctx.moveTo(-3, -4); ctx.lineTo(-7, 0);
              ctx.moveTo(3, -4); ctx.lineTo(7, 0); ctx.moveTo(7, -4); ctx.lineTo(3, 0);
              ctx.stroke();
@@ -214,20 +294,23 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
             ctx.fill()
         }
 
-        ctx.fillStyle = "#FF8C00"
+        // Beak
+        ctx.fillStyle = "#F97316" // Orange 500
         ctx.beginPath()
         if (state === 'falling' || isScared) ctx.ellipse(0, 5, 3, 5, 0, 0, Math.PI*2);
         else { ctx.moveTo(-3, 2 + eyeOffsetY); ctx.lineTo(3, 2 + eyeOffsetY); ctx.lineTo(0, 6 + eyeOffsetY); }
         ctx.fill()
 
+        // Blush
         if (state !== 'falling' && !isScared) {
-            ctx.fillStyle = "rgba(255, 100, 100, 0.4)"; ctx.beginPath();
+            ctx.fillStyle = "rgba(244, 63, 94, 0.4)"; ctx.beginPath();
             ctx.arc(-7, 3 + eyeOffsetY, 2, 0, Math.PI * 2); ctx.arc(7, 3 + eyeOffsetY, 2, 0, Math.PI * 2); ctx.fill();
         }
 
+        // Wings
         if (state === 'jumping' || state === 'falling') {
             const wingFlap = Math.sin(jumpFrame * 0.6) * 6; 
-            ctx.fillStyle = "#FFD700"; ctx.strokeStyle = "#DAA520"; ctx.lineWidth = 1.5;
+            ctx.fillStyle = "#FFC107"; ctx.strokeStyle = "#B45309"; ctx.lineWidth = 1.5;
             ctx.beginPath(); ctx.ellipse(-12, -wingFlap, 6, 3, Math.PI / 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
             ctx.beginPath(); ctx.ellipse(12, -wingFlap, 6, 3, -Math.PI / 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         }
@@ -254,8 +337,8 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       if (overlap <= 0) {
         gameOver = true
         chickState = 'falling'
-        chickVelY = -6 
-        isScared = true 
+        chickVelY = -6
+        isScared = true
       } else {
         currentWidth = overlap
         currentX = overlapStart
@@ -270,8 +353,6 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
         score++
         callbacks.current.onScoreChange(score)
         
-        // CHANGED: Reduced speed increase from 0.2 to 0.08
-        // This makes the game get harder much slower
         speed += 0.08
         
         direction = Math.random() > 0.5 ? 1 : -1
@@ -294,17 +375,17 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
       drawBackground()
 
       ctx.save()
-      ctx.translate(0, cameraOffset) 
+      ctx.translate(0, cameraOffset)
 
       stackedBlocks.forEach((block) => {
         drawTexturedBlock(block.x, block.y, block.width, BLOCK_HEIGHT, block.color)
       })
 
       const topBlock = stackedBlocks[stackedBlocks.length - 1]
-      const chickFloor = topBlock.y; 
+      const chickFloor = topBlock.y;
 
       const targetChickX = topBlock.x + topBlock.width / 2;
-      chickX += (targetChickX - chickX) * (0.15 * timeScale); 
+      chickX += (targetChickX - chickX) * (0.15 * timeScale);
 
       if (gameStarted && !gameOver) {
         currentX += (speed * direction) * timeScale;
@@ -358,24 +439,32 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
              showGameOverScreen = true;
              callbacks.current.onGameOver(score);
          }
-      } 
+      }
       
-      if (!gameStarted) drawChick(chickX, chickFloor, 'standing', 0) 
+      if (!gameStarted) drawChick(chickX, chickFloor, 'standing', 0)
       else drawChick(chickX, chickY, chickState, chickJumpFrame)
 
       ctx.restore()
 
+      // UI Overlays
       if (!gameStarted) {
         ctx.fillStyle = "rgba(0,0,0,0.5)"
         ctx.fillRect(0, 0, gameWidth, gameHeight)
-        ctx.fillStyle = "white"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center";
+        
+        ctx.shadowColor="rgba(0,0,0,0.5)"; ctx.shadowBlur=10;
+        ctx.fillStyle = "#F8FAFC"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center";
         ctx.fillText("Click to Stack", gameWidth/2, gameHeight/2)
-      } else if (showGameOverScreen) { 
-        ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(0, 0, gameWidth, gameHeight)
-        ctx.fillStyle = "white"; ctx.font = "bold 30px Arial"; ctx.textAlign = "center";
-        ctx.shadowColor="black"; ctx.shadowBlur=4;
-        ctx.fillText("Game Over", gameWidth/2, gameHeight/2 - 20)
         ctx.shadowBlur=0
+      } else if (showGameOverScreen) {
+        ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillRect(0, 0, gameWidth, gameHeight)
+        
+        ctx.fillStyle = "white"; ctx.font = "bold 30px Arial"; ctx.textAlign = "center";
+        ctx.shadowColor="#4ADE80"; ctx.shadowBlur=20;
+        ctx.fillText("Game Over", gameWidth/2, gameHeight/2 - 20)
+        
+        ctx.shadowBlur=0;
+        ctx.font = "18px Arial"; 
+        ctx.fillText(`Final Score: ${score}`, gameWidth/2, gameHeight/2 + 20)
       }
 
       animationId = requestAnimationFrame(draw)
@@ -405,7 +494,7 @@ const GameCanvas = forwardRef<HTMLCanvasElement, GameCanvasProps>(({ onScoreChan
   return (
     <canvas
       ref={canvasRef}
-      className="bg-sky-200 cursor-pointer border-4 border-white/50 rounded-lg shadow-xl block mx-auto"
+      className="cursor-pointer border-4 border-slate-700/50 rounded-lg shadow-2xl block mx-auto"
       style={{ touchAction: "none", maxWidth: "100%", height: "auto" }}
     />
   )
